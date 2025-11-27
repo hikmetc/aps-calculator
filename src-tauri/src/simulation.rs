@@ -103,7 +103,7 @@ pub fn run_simulation<R: tauri::Runtime>(config: SimulationConfig, app_handle: O
     } else {
         names.push(format!("<{}", config.cdls[0]));
         for i in 0..config.cdls.len() - 1 {
-            names.push(format!("{}-{}", config.cdls[i], config.cdls[i+1]));
+            names.push(format!("≥{} and <{}", config.cdls[i], config.cdls[i+1]));
         }
         names.push(format!("≥{}", config.cdls[config.cdls.len()-1]));
     }

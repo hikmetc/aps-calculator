@@ -34,3 +34,17 @@ git push origin v1.0.0
 4.  You will see `App v1.0.0`. Expand "Assets" to find:
     -   `aps-calculator...setup.exe` (for Windows)
     -   `aps-calculator...dmg` (for Mac)
+
+## Troubleshooting: "Password authentication is not supported"
+
+If you see an error saying **"Password authentication is not supported"**, it means you cannot use your GitHub password. You must use a **Personal Access Token**.
+
+1.  Go to **[GitHub Token Settings](https://github.com/settings/tokens/new)**.
+2.  **Note:** "APS Calculator Token".
+3.  **Expiration:** "No expiration" (or 30 days).
+4.  **Select scopes:** Check **`repo`** (Full control of private repositories) and **`workflow`**.
+5.  Click **Generate token**.
+6.  **COPY** the token (it starts with `ghp_...`).
+7.  Run `git push -u origin main` again.
+8.  **Username:** `hikmetc`
+9.  **Password:** PASTE THE TOKEN you just copied (it will not show up on screen, just paste and press Enter).

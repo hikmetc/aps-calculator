@@ -402,7 +402,7 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
     return (
         <div className="flex-1 flex flex-col bg-white overflow-hidden">
             <div className="flex justify-center bg-white p-4 border-b border-gray-100">
-                <img src="/icon.png" alt="Logo" className="w-full max-w-3xl h-auto" />
+                <img src="/header-logo.png" alt="Logo" className="w-full max-w-3xl h-auto" />
             </div>
             <div className="border-b border-gray-200 bg-gray-50">
                 <nav className="flex -mb-px px-4 overflow-x-auto" aria-label="Tabs">
