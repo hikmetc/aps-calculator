@@ -183,7 +183,7 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
                 x: x,
                 y: y,
                 mode: 'lines+markers',
-                type: 'scattergl', // WebGL for better performance
+                type: 'scatter',
                 marker: { color: '#3b82f6', size: markerSize },
                 line: { color: '#3b82f6' },
                 name: metric
@@ -234,7 +234,7 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
                 x: x,
                 y: y,
                 mode: 'markers',
-                type: 'scattergl', // WebGL for better performance
+                type: 'scatter',
                 marker: {
                     color: colors,
                     size: markerSize,
@@ -343,7 +343,7 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
                 x: indices.map(i => x[i]),
                 y: indices.map(i => y[i]),
                 mode: 'markers',
-                type: 'scattergl' as const, // WebGL for better performance
+                type: 'scatter' as const,
                 name: `≥${agreementThresholds.min}% (${cat})`,
                 marker: {
                     color: categoryColors[cat],
