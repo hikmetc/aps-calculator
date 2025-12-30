@@ -377,59 +377,61 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
     };
 
     const render3DPlot = (levelIndex?: number) => {
-        if (!results || isMuModel) return null; // Hide for MU model
+        if (!results || isMuModel) return null; // Hide 3D plot for MU model
 
-        // Get unique sorted bias and imprecision values
-        const biasValues = [...new Set(results.mu_data.map(d => d.bias * 100))].sort((a, b) => a - b);
-        const imprecisionValues = [...new Set(results.mu_data.map(d => d.mu * 100))].sort((a, b) => a - b);
+        const x = results.mu_data.map(d => d.bias * 100);
+        const y = results.mu_data.map(d => d.mu * 100);
 
-        // Create a lookup map for faster access
-        const dataMap = new Map<string, typeof results.mu_data[0]>();
-        results.mu_data.forEach(d => {
-            dataMap.set(`${d.bias * 100}_${d.mu * 100}`, d);
-        });
+        const getZ = (metric: 'agreement' | 'sensitivity' | 'specificity') => results.mu_data.map(d => {
+            if (levelIndex !== undefined) {
+                const val = metric === 'agreement' ? d.sublevel_agreement?.[levelIndex]
+                    : metric === 'sensitivity' ? d.sublevel_sensitivity?.[levelIndex]
+                        : d.sublevel_specificity?.[levelIndex];
+                return val ?? 0;
+            }
+            return d[metric];
+        }).map(v => v * 100);
 
-        // Build z matrix for heatmap
-        const getZMatrix = (metric: 'agreement' | 'sensitivity' | 'specificity') => {
-            return imprecisionValues.map(imp =>
-                biasValues.map(bias => {
-                    const d = dataMap.get(`${bias}_${imp}`);
-                    if (!d) return 0;
-                    if (levelIndex !== undefined) {
-                        const val = metric === 'agreement' ? d.sublevel_agreement?.[levelIndex]
-                            : metric === 'sensitivity' ? d.sublevel_sensitivity?.[levelIndex]
-                                : d.sublevel_specificity?.[levelIndex];
-                        return (val ?? 0) * 100;
-                    }
-                    return d[metric] * 100;
-                })
-            );
-        };
-
-        const zMatrix = getZMatrix('agreement');
+        const z_agree = getZ('agreement');
+        const z_sens = getZ('sensitivity');
+        const z_spec = getZ('specificity');
 
         return (
             <div className="h-[600px] mt-8">
-                <h3 className="text-lg font-semibold mb-4">Agreement Heatmap (Bias × Imprecision)</h3>
+                <h3 className="text-lg font-semibold mb-4">3D Visualization</h3>
                 <Plot
-                    data={[{
-                        x: biasValues,
-                        y: imprecisionValues,
-                        z: zMatrix,
-                        type: 'heatmap',
-                        colorscale: 'RdYlGn',
-                        reversescale: false,
-                        colorbar: {
-                            title: { text: 'Agreement (%)', side: 'right' }
+                    data={[
+                        {
+                            x: x, y: y, z: z_agree,
+                            mode: 'markers',
+                            type: 'scatter3d',
+                            marker: { size: 3, color: z_agree, colorscale: 'Viridis', opacity: 0.8 },
+                            name: 'Agreement'
                         },
-                        hovertemplate: 'Bias: %{x}%<br>Imprecision: %{y}%<br>Agreement: %{z:.1f}%<extra></extra>'
-                    }]}
+                        {
+                            x: x, y: y, z: z_sens,
+                            mode: 'markers',
+                            type: 'scatter3d',
+                            marker: { size: 3, color: 'rgb(128, 0, 128)', opacity: 0.6, symbol: 'diamond' },
+                            name: 'Sensitivity'
+                        },
+                        {
+                            x: x, y: y, z: z_spec,
+                            mode: 'markers',
+                            type: 'scatter3d',
+                            marker: { size: 3, color: 'rgb(204, 85, 119)', opacity: 0.6, symbol: 'circle' },
+                            name: 'Specificity'
+                        }
+                    ]}
                     layout={{
-                        title: { text: 'Agreement Heatmap' },
-                        xaxis: { title: { text: 'Bias (%)' } },
-                        yaxis: { title: { text: 'Imprecision (%)' } },
+                        title: { text: '3D Scatter Plot of Bias, Imprecision, and Metrics' },
+                        scene: {
+                            xaxis: { title: { text: 'Bias (%)' } },
+                            yaxis: { title: { text: 'Imprecision (%)' } },
+                            zaxis: { title: { text: 'Metric (%)' } }
+                        },
                         autosize: true,
-                        margin: { l: 60, r: 20, b: 50, t: 50 }
+                        margin: { l: 0, r: 0, b: 0, t: 0 }
                     }}
                     useResizeHandler={true}
                     style={{ width: '100%', height: '100%' }}
