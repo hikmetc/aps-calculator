@@ -42,6 +42,9 @@ pub struct SimulationPoint {
     pub agreement: f64,
     pub sensitivity: f64,
     pub specificity: f64,
+    pub per_seed_agreement: Vec<f64>,      // 10 values, one per seed
+    pub per_seed_sensitivity: Vec<f64>,    // 10 values, one per seed
+    pub per_seed_specificity: Vec<f64>,    // 10 values, one per seed
     pub agreement_cat: String,
     pub sensitivity_cat: String,
     pub specificity_cat: String,
@@ -180,6 +183,11 @@ pub fn run_simulation<R: tauri::Runtime>(config: SimulationConfig, app_handle: O
             let mut total_sensitivity = 0.0;
             let mut total_specificity = 0.0;
             
+            // Store per-seed values for CI calculation
+            let mut seed_agreements: Vec<f64> = Vec::with_capacity(10);
+            let mut seed_sensitivities: Vec<f64> = Vec::with_capacity(10);
+            let mut seed_specificities: Vec<f64> = Vec::with_capacity(10);
+            
             let mut sub_agreement = vec![0.0; names.len()];
             let mut sub_sensitivity = vec![0.0; names.len()];
             let mut sub_specificity = vec![0.0; names.len()];
@@ -268,13 +276,32 @@ pub fn run_simulation<R: tauri::Runtime>(config: SimulationConfig, app_handle: O
                     sub_specificity[i] += if tn + fp > 0 { tn as f64 / (tn + fp) as f64 } else { 0.0 };
                 }
                 
-                total_specificity += if sum_tn + sum_fp > 0 { sum_tn as f64 / (sum_tn + sum_fp) as f64 } else { 0.0 };
+                let spec_val = if sum_tn + sum_fp > 0 { sum_tn as f64 / (sum_tn + sum_fp) as f64 } else { 0.0 };
+                total_specificity += spec_val;
+                
+                // Store per-seed values
+                seed_agreements.push(tp_total as f64 / total_samples as f64);
+                seed_sensitivities.push(tp_total as f64 / total_samples as f64);
+                seed_specificities.push(spec_val);
             }
 
             // Average over 10 seeds
             let avg_agreement = total_agreement / 10.0;
             let avg_sensitivity = total_sensitivity / 10.0;
             let avg_specificity = total_specificity / 10.0;
+            
+            // Calculate percentiles for CI (2.5th and 97.5th)
+            // With 10 samples: index 0 is ~2.5th percentile, index 9 is ~97.5th percentile
+            seed_agreements.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            seed_sensitivities.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            seed_specificities.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            
+            let agreement_lower = seed_agreements[0];
+            let agreement_upper = seed_agreements[9];
+            let sensitivity_lower = seed_sensitivities[0];
+            let sensitivity_upper = seed_sensitivities[9];
+            let specificity_lower = seed_specificities[0];
+            let specificity_upper = seed_specificities[9];
             
             let avg_sub_agreement: Vec<f64> = sub_agreement.iter().map(|x| x / 10.0).collect();
             let avg_sub_sensitivity: Vec<f64> = sub_sensitivity.iter().map(|x| x / 10.0).collect();
@@ -300,6 +327,9 @@ pub fn run_simulation<R: tauri::Runtime>(config: SimulationConfig, app_handle: O
                 agreement: avg_agreement,
                 sensitivity: avg_sensitivity,
                 specificity: avg_specificity,
+                per_seed_agreement: seed_agreements.clone(),
+                per_seed_sensitivity: seed_sensitivities.clone(),
+                per_seed_specificity: seed_specificities.clone(),
                 agreement_cat: get_cat(avg_agreement),
                 sensitivity_cat: get_cat(avg_sensitivity),
                 specificity_cat: get_cat(avg_specificity),

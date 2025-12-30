@@ -208,10 +208,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, setState, columns, onUp
                                 <div>
                                     <span className="text-xs text-gray-500 block">Step Size (%)</span>
                                     <input
-                                        type="number" step="0.01"
+                                        type="number" step="0.1"
                                         className="w-full border border-gray-300 rounded-md p-1 text-sm"
                                         value={state.stepSizeMu}
-                                        onChange={(e) => setState(prev => ({ ...prev, stepSizeMu: parseFloat(e.target.value) || 0 }))}
+                                        onChange={(e) => setState(prev => ({ ...prev, stepSizeMu: parseFloat(e.target.value) || 0.5 }))}
                                     />
                                 </div>
                             </div>
@@ -251,7 +251,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ state, setState, columns, onUp
                                         type="number" step="0.1"
                                         className="w-full border border-gray-300 rounded-md p-1 text-sm"
                                         value={state.stepSizeImpBias}
-                                        onChange={(e) => setState(prev => ({ ...prev, stepSizeImpBias: parseFloat(e.target.value) || 0 }))}
+                                        onChange={(e) => setState(prev => ({ ...prev, stepSizeImpBias: parseFloat(e.target.value) || 0.5 }))}
                                     />
                                 </div>
                             </div>

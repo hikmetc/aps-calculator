@@ -47,35 +47,75 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
         );
     }
 
-    const renderSummaryTable = (metric: 'agreement' | 'sensitivity' | 'specificity', levelIndex?: number) => {
+    const renderSummaryTable = (metric: 'agreement' | 'sensitivity' | 'specificity') => {
         if (!results) return null;
 
-        const getLimit = (threshold: number, type: 'mu' | 'bias_pos' | 'bias_neg') => {
-            // Filter points that meet the threshold
-            const validPoints = results.mu_data.filter(d => {
-                const val = levelIndex !== undefined
-                    ? (metric === 'agreement' ? d.sublevel_agreement?.[levelIndex]
-                        : metric === 'sensitivity' ? d.sublevel_sensitivity?.[levelIndex]
-                            : d.sublevel_specificity?.[levelIndex])
-                    : d[metric];
-                return (val ?? 0) * 100 >= threshold;
-            });
+        interface LimitResult {
+            value: string;
+            ci?: string; // "lower - upper" format
+        }
 
-            if (validPoints.length === 0) return "NO"; // Not Obtainable
+        // Helper to get per-seed metric array key
+        const getPerSeedKey = (m: 'agreement' | 'sensitivity' | 'specificity') => {
+            return `per_seed_${m}` as keyof typeof results.mu_data[0];
+        };
 
-            if (type === 'mu') {
-                // Scale MU by 100
-                const maxMu = Math.max(...validPoints.map(d => d.mu * 100));
-                return maxMu > 33 ? "NA" : maxMu.toFixed(1);
-            } else if (type === 'bias_pos') {
-                // Scale Bias by 100
-                const maxBias = Math.max(...validPoints.map(d => d.bias * 100));
-                return maxBias > 33 ? "NA" : maxBias.toFixed(1);
-            } else {
-                // Scale Bias by 100
-                const minBias = Math.min(...validPoints.map(d => d.bias * 100));
-                return Math.abs(minBias) > 33 ? "NA" : minBias.toFixed(1);
+        const getLimit = (threshold: number, type: 'mu' | 'bias_pos' | 'bias_neg'): LimitResult => {
+            // For each seed (0-9), find the max MU (or max/min bias) that meets the threshold
+            const seedLimits: number[] = [];
+
+            for (let seedIdx = 0; seedIdx < 10; seedIdx++) {
+                // Filter points that meet the threshold FOR THIS SEED
+                const validPoints = results.mu_data.filter(d => {
+                    const perSeedArray = d[getPerSeedKey(metric)] as number[];
+                    if (!perSeedArray || perSeedArray.length <= seedIdx) return false;
+                    const val = perSeedArray[seedIdx];
+                    return (val ?? 0) * 100 >= threshold;
+                });
+
+                if (validPoints.length === 0) {
+                    // This seed has no valid points
+                    continue;
+                }
+
+                if (type === 'mu') {
+                    const maxMu = Math.max(...validPoints.map(d => d.mu * 100));
+                    if (maxMu <= 33) seedLimits.push(maxMu);
+                } else if (type === 'bias_pos') {
+                    const maxBias = Math.max(...validPoints.map(d => d.bias * 100));
+                    if (maxBias <= 33) seedLimits.push(maxBias);
+                } else {
+                    const minBias = Math.min(...validPoints.map(d => d.bias * 100));
+                    if (Math.abs(minBias) <= 33) seedLimits.push(minBias);
+                }
             }
+
+            if (seedLimits.length === 0) return { value: "NO" }; // Not Obtainable
+
+            // Calculate mean and CI bounds
+            const meanLimit = seedLimits.reduce((a, b) => a + b, 0) / seedLimits.length;
+            const sortedLimits = [...seedLimits].sort((a, b) => a - b);
+            const lowerCI = sortedLimits[0];
+            const upperCI = sortedLimits[sortedLimits.length - 1];
+
+            if (meanLimit > 33) return { value: "NA" };
+
+            return {
+                value: meanLimit.toFixed(1),
+                ci: `${lowerCI.toFixed(1)} - ${upperCI.toFixed(1)}`
+            };
+        };
+
+        const renderCell = (result: LimitResult) => {
+            if (result.ci) {
+                return (
+                    <div>
+                        <span className="font-medium">{result.value}</span>
+                        <span className="text-xs text-gray-500 ml-1">({result.ci})</span>
+                    </div>
+                );
+            }
+            return result.value;
         };
 
         const rows = [
@@ -87,6 +127,7 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
         return (
             <div className="mt-8">
                 <h4 className="text-md font-semibold mb-2">APS Limits</h4>
+                <p className="text-xs text-gray-500 mb-2">Values shown with 95% CI in parentheses</p>
                 <table className="min-w-full divide-y divide-gray-200 border">
                     <thead className="bg-gray-50">
                         <tr>
@@ -100,9 +141,9 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
                         {rows.map((row) => (
                             <tr key={row.label}>
                                 <td className={`px-6 py-4 whitespace-nowrap font-medium ${row.color}`}>{row.label}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">{getLimit(row.threshold, 'mu')}</td>
-                                {!isMuModel && <td className="px-6 py-4 whitespace-nowrap">{getLimit(row.threshold, 'bias_pos')}</td>}
-                                {!isMuModel && <td className="px-6 py-4 whitespace-nowrap">{getLimit(row.threshold, 'bias_neg')}</td>}
+                                <td className="px-6 py-4 whitespace-nowrap">{renderCell(getLimit(row.threshold, 'mu'))}</td>
+                                {!isMuModel && <td className="px-6 py-4 whitespace-nowrap">{renderCell(getLimit(row.threshold, 'bias_pos'))}</td>}
+                                {!isMuModel && <td className="px-6 py-4 whitespace-nowrap">{renderCell(getLimit(row.threshold, 'bias_neg'))}</td>}
                             </tr>
                         ))}
                     </tbody>
@@ -135,12 +176,15 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
                 return d[metric] * 100;
             }); // Metric on X
 
+            // Determine marker size based on data count
+            const markerSize = x.length > 1000 ? 3 : x.length > 500 ? 5 : 8;
+
             plotData = [{
                 x: x,
                 y: y,
                 mode: 'lines+markers',
-                type: 'scatter',
-                marker: { color: '#3b82f6' },
+                type: 'scattergl', // WebGL for better performance
+                marker: { color: '#3b82f6', size: markerSize },
                 line: { color: '#3b82f6' },
                 name: metric
             }];
@@ -171,28 +215,30 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
 
             const colors = z_pct.map(val => {
                 if (usePastelColors) {
-                    if (val >= agreementThresholds.opt) return '#76C7C0';
-                    if (val >= agreementThresholds.des) return '#5DADE2';
-                    if (val >= agreementThresholds.min) return '#F4D03F';
-                    return '#EC7063';
+                    if (val >= agreementThresholds.opt) return '#2E7D32';  // Dark green
+                    if (val >= agreementThresholds.des) return '#1565C0';  // Dark blue
+                    if (val >= agreementThresholds.min) return '#F57C00';  // Dark orange
+                    return '#C62828';  // Dark red
                 } else {
-                    if (val >= agreementThresholds.opt) return 'rgb(0, 0, 255)';
-                    if (val >= agreementThresholds.des) return 'rgb(0, 176, 0)';
-                    if (val >= agreementThresholds.min) return 'rgb(166, 0, 0)';
-                    return 'rgb(200, 200, 200)';
+                    if (val >= agreementThresholds.opt) return 'rgb(0, 0, 180)';      // Darker blue
+                    if (val >= agreementThresholds.des) return 'rgb(0, 130, 0)';      // Darker green
+                    if (val >= agreementThresholds.min) return 'rgb(180, 0, 0)';      // Darker red
+                    return 'rgb(120, 120, 120)';  // Darker gray
                 }
             });
+
+            // Determine marker size based on data count
+            const markerSize = x.length > 5000 ? 2 : x.length > 1000 ? 4 : x.length > 500 ? 6 : 8;
 
             plotData = [{
                 x: x,
                 y: y,
                 mode: 'markers',
-                type: 'scatter',
+                type: 'scattergl', // WebGL for better performance
                 marker: {
                     color: colors,
-                    size: 8,
-                    opacity: 0.7,
-                    line: { width: 1, color: 'black' }
+                    size: markerSize,
+                    opacity: 0.7
                 },
                 text: z_pct.map(v => `${metric}: ${v.toFixed(1)}%`),
                 hoverinfo: 'x+y+text',
@@ -219,7 +265,7 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
                         style={{ width: '100%', height: '100%' }}
                     />
                 </div>
-                {renderSummaryTable(metric, levelIndex)}
+                {renderSummaryTable(metric)}
             </div>
         );
     };
@@ -287,6 +333,9 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
             "Other": '#D7DBDD'
         };
 
+        // Determine marker size based on data count
+        const markerSize = x.length > 5000 ? 2 : x.length > 1000 ? 4 : x.length > 500 ? 6 : 8;
+
         const traces = uniqueCategories.map(cat => {
             const indices = categories.map((c, i) => c === cat ? i : -1).filter(i => i !== -1);
             if (indices.length === 0) return null;
@@ -294,13 +343,12 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
                 x: indices.map(i => x[i]),
                 y: indices.map(i => y[i]),
                 mode: 'markers',
-                type: 'scatter' as const,
+                type: 'scattergl' as const, // WebGL for better performance
                 name: `≥${agreementThresholds.min}% (${cat})`,
                 marker: {
                     color: categoryColors[cat],
-                    size: 8,
-                    opacity: 0.7,
-                    line: { width: 1, color: 'black' }
+                    size: markerSize,
+                    opacity: 0.7
                 },
                 hoverinfo: 'x+y+name' as const
             };

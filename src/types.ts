@@ -32,6 +32,9 @@ export interface SimulationPoint {
     agreement: number;
     sensitivity: number;
     specificity: number;
+    per_seed_agreement: number[];      // 10 values, one per seed
+    per_seed_sensitivity: number[];    // 10 values, one per seed
+    per_seed_specificity: number[];    // 10 values, one per seed
     agreement_cat: string;
     sensitivity_cat: string;
     specificity_cat: string;
