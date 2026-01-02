@@ -61,10 +61,10 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
         };
 
         const getLimit = (threshold: number, type: 'mu' | 'bias_pos' | 'bias_neg'): LimitResult => {
-            // For each seed (0-9), find the max MU (or max/min bias) that meets the threshold
+            // For each seed (0-39), find the max MU (or max/min bias) that meets the threshold
             const seedLimits: number[] = [];
 
-            for (let seedIdx = 0; seedIdx < 10; seedIdx++) {
+            for (let seedIdx = 0; seedIdx < 40; seedIdx++) {
                 // Filter points that meet the threshold FOR THIS SEED
                 const validPoints = results.mu_data.filter(d => {
                     const perSeedArray = d[getPerSeedKey(metric)] as number[];
@@ -92,11 +92,18 @@ export const Results: React.FC<ResultsProps> = ({ results, originalData, isSimul
 
             if (seedLimits.length === 0) return { value: "NO" }; // Not Obtainable
 
-            // Calculate mean and CI bounds
+            // Calculate mean and CI bounds using 2.5th and 97.5th percentiles
             const meanLimit = seedLimits.reduce((a, b) => a + b, 0) / seedLimits.length;
             const sortedLimits = [...seedLimits].sort((a, b) => a - b);
-            const lowerCI = sortedLimits[0];
-            const upperCI = sortedLimits[sortedLimits.length - 1];
+
+            // For 40 values: exclude 1 value (2.5%) from each tail
+            // 2.5th percentile = index 1 (skip first value)
+            // 97.5th percentile = index 38 (skip last value)
+            const n = sortedLimits.length;
+            const lowerIdx = Math.ceil(0.025 * n);      // = 1 for n=40
+            const upperIdx = Math.floor(0.975 * n) - 1; // = 38 for n=40
+            const lowerCI = sortedLimits[Math.min(lowerIdx, n - 1)];
+            const upperCI = sortedLimits[Math.max(upperIdx, 0)];
 
             if (meanLimit > 33) return { value: "NA" };
 

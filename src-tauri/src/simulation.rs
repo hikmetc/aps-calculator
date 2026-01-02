@@ -184,16 +184,16 @@ pub fn run_simulation<R: tauri::Runtime>(config: SimulationConfig, app_handle: O
             let mut total_specificity = 0.0;
             
             // Store per-seed values for CI calculation
-            let mut seed_agreements: Vec<f64> = Vec::with_capacity(10);
-            let mut seed_sensitivities: Vec<f64> = Vec::with_capacity(10);
-            let mut seed_specificities: Vec<f64> = Vec::with_capacity(10);
+            let mut seed_agreements: Vec<f64> = Vec::with_capacity(40);
+            let mut seed_sensitivities: Vec<f64> = Vec::with_capacity(40);
+            let mut seed_specificities: Vec<f64> = Vec::with_capacity(40);
             
             let mut sub_agreement = vec![0.0; names.len()];
             let mut sub_sensitivity = vec![0.0; names.len()];
             let mut sub_specificity = vec![0.0; names.len()];
 
-            // Run 10 seeds
-            for s in 1..=10 {
+            // Run 40 seeds for proper 95% CI estimation
+            for s in 1..=40 {
                 let mut rng = StdRng::seed_from_u64(s + 1234);
                 let noise: Vec<f64> = (0..data.len())
                     .map(|_| rng.sample::<f64, _>(StandardNormal))
@@ -285,27 +285,27 @@ pub fn run_simulation<R: tauri::Runtime>(config: SimulationConfig, app_handle: O
                 seed_specificities.push(spec_val);
             }
 
-            // Average over 10 seeds
-            let avg_agreement = total_agreement / 10.0;
-            let avg_sensitivity = total_sensitivity / 10.0;
-            let avg_specificity = total_specificity / 10.0;
+            // Average over 40 seeds
+            let avg_agreement = total_agreement / 40.0;
+            let avg_sensitivity = total_sensitivity / 40.0;
+            let avg_specificity = total_specificity / 40.0;
             
             // Calculate percentiles for CI (2.5th and 97.5th)
-            // With 10 samples: index 0 is ~2.5th percentile, index 9 is ~97.5th percentile
+            // With 40 samples: index 0 is 2.5th percentile, index 39 is 97.5th percentile
             seed_agreements.sort_by(|a, b| a.partial_cmp(b).unwrap());
             seed_sensitivities.sort_by(|a, b| a.partial_cmp(b).unwrap());
             seed_specificities.sort_by(|a, b| a.partial_cmp(b).unwrap());
             
-            let agreement_lower = seed_agreements[0];
-            let agreement_upper = seed_agreements[9];
-            let sensitivity_lower = seed_sensitivities[0];
-            let sensitivity_upper = seed_sensitivities[9];
-            let specificity_lower = seed_specificities[0];
-            let specificity_upper = seed_specificities[9];
+            let _agreement_lower = seed_agreements[0];
+            let _agreement_upper = seed_agreements[39];
+            let _sensitivity_lower = seed_sensitivities[0];
+            let _sensitivity_upper = seed_sensitivities[39];
+            let _specificity_lower = seed_specificities[0];
+            let _specificity_upper = seed_specificities[39];
             
-            let avg_sub_agreement: Vec<f64> = sub_agreement.iter().map(|x| x / 10.0).collect();
-            let avg_sub_sensitivity: Vec<f64> = sub_sensitivity.iter().map(|x| x / 10.0).collect();
-            let avg_sub_specificity: Vec<f64> = sub_specificity.iter().map(|x| x / 10.0).collect();
+            let avg_sub_agreement: Vec<f64> = sub_agreement.iter().map(|x| x / 40.0).collect();
+            let avg_sub_sensitivity: Vec<f64> = sub_sensitivity.iter().map(|x| x / 40.0).collect();
+            let avg_sub_specificity: Vec<f64> = sub_specificity.iter().map(|x| x / 40.0).collect();
 
             // Determine Categories
             let get_cat = |val: f64| -> String {
